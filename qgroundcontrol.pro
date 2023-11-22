@@ -45,7 +45,10 @@ MacBuild {
 }
 
 LinuxBuild {
-    CONFIG  += qesp_linux_udev
+    CONFIG += qesp_linux_udev
+    system("$$QMAKE_LINK -fuse-ld=gold -Wl,--version &>/dev/null") {
+        CONFIG += use_gold_linker
+    }
 }
 
 WindowsBuild {
@@ -179,13 +182,12 @@ contains (CONFIG, QGC_DISABLE_PX4_PLUGIN_FACTORY) {
 
 # Bluetooth
 contains (DEFINES, QGC_DISABLE_BLUETOOTH) {
-    message("Skipping support for Bluetooth (manual override from command line)")
+    message("Bluetooth support disabled (manual override from command line)")
     DEFINES -= QGC_ENABLE_BLUETOOTH
 } else:exists(user_config.pri):infile(user_config.pri, DEFINES, QGC_DISABLE_BLUETOOTH) {
-    message("Skipping support for Bluetooth (manual override from user_config.pri)")
+    message("Bluetooth support disabled (manual override from user_config.pri)")
     DEFINES -= QGC_ENABLE_BLUETOOTH
 } else:exists(user_config.pri):infile(user_config.pri, DEFINES, QGC_ENABLE_BLUETOOTH) {
-    message("Including support for Bluetooth (manual override from user_config.pri)")
     DEFINES += QGC_ENABLE_BLUETOOTH
 }
 
@@ -428,6 +430,8 @@ contains (DEFINES, QGC_ENABLE_PAIRING) {
 #
 
 HEADERS += \
+    src/QmlControls/CustomAction.h \
+    src/QmlControls/CustomActionManager.h \
     src/QmlControls/QmlUnitsConversion.h \
     src/Vehicle/VehicleEscStatusFactGroup.h \
     src/api/QGCCorePlugin.h \
@@ -442,6 +446,7 @@ contains (DEFINES, QGC_ENABLE_PAIRING) {
 }
 
 SOURCES += \
+    src/QmlControls/CustomActionManager.cc \
     src/Vehicle/VehicleEscStatusFactGroup.cc \
     src/api/QGCCorePlugin.cc \
     src/api/QGCOptions.cc \
@@ -493,6 +498,7 @@ DebugBuild { PX4FirmwarePlugin { PX4FirmwarePluginFactory { APMFirmwarePlugin { 
         src/MissionManager/TransectStyleComplexItemTestBase.h \
         src/MissionManager/VisualMissionItemTest.h \
         src/qgcunittest/ComponentInformationCacheTest.h \
+        src/qgcunittest/ComponentInformationTranslationTest.h \
         src/qgcunittest/GeoTest.h \
         src/qgcunittest/MavlinkLogTest.h \
         src/qgcunittest/MultiSignalSpy.h \
@@ -541,6 +547,7 @@ DebugBuild { PX4FirmwarePlugin { PX4FirmwarePluginFactory { APMFirmwarePlugin { 
         src/MissionManager/TransectStyleComplexItemTestBase.cc \
         src/MissionManager/VisualMissionItemTest.cc \
         src/qgcunittest/ComponentInformationCacheTest.cc \
+        src/qgcunittest/ComponentInformationTranslationTest.cc \
         src/qgcunittest/GeoTest.cc \
         src/qgcunittest/MavlinkLogTest.cc \
         src/qgcunittest/MultiSignalSpy.cc \
@@ -642,6 +649,7 @@ HEADERS += \
     src/Geo/PolarStereographic.hpp \
     src/QGC.h \
     src/QGCApplication.h \
+    src/QGCCachedFileDownload.h \
     src/QGCComboBox.h \
     src/QGCConfig.h \
     src/QGCFileDownload.h \
@@ -674,6 +682,7 @@ HEADERS += \
     src/Settings/AppSettings.h \
     src/Settings/AutoConnectSettings.h \
     src/Settings/BrandImageSettings.h \
+    src/Settings/RemoteIDSettings.h \
     src/Settings/FirmwareUpgradeSettings.h \
     src/Settings/FlightMapSettings.h \
     src/Settings/FlyViewSettings.h \
@@ -703,16 +712,19 @@ HEADERS += \
     src/Vehicle/CompInfoGeneral.h \
     src/Vehicle/ComponentInformationCache.h \
     src/Vehicle/ComponentInformationManager.h \
+    src/Vehicle/ComponentInformationTranslation.h \
     src/Vehicle/EventHandler.h \
     src/Vehicle/FTPManager.h \
     src/Vehicle/GPSRTKFactGroup.h \
-    src/Vehicle/HealthAndArmingChecks.h \
+    src/Vehicle/HealthAndArmingCheckReport.h \
     src/Vehicle/ImageProtocolManager.h \
     src/Vehicle/InitialConnectStateMachine.h \
     src/Vehicle/MAVLinkLogManager.h \
     src/Vehicle/MAVLinkStreamConfig.h \
     src/Vehicle/MultiVehicleManager.h \
+    src/Vehicle/RemoteIDManager.h \
     src/Vehicle/StateMachine.h \
+    src/Vehicle/StandardModes.h \
     src/Vehicle/SysStatusSensorInfo.h \
     src/Vehicle/TerrainFactGroup.h \
     src/Vehicle/TerrainProtocolHandler.h \
@@ -733,6 +745,8 @@ HEADERS += \
     src/Vehicle/VehicleVibrationFactGroup.h \
     src/Vehicle/VehicleWindFactGroup.h \
     src/Vehicle/VehicleHygrometerFactGroup.h \
+    src/Vehicle/VehicleGeneratorFactGroup.h \
+    src/Vehicle/VehicleEFIFactGroup.h \
     src/VehicleSetup/JoystickConfigController.h \
     src/comm/LinkConfiguration.h \
     src/comm/LinkInterface.h \
@@ -785,7 +799,7 @@ contains (DEFINES, QGC_ENABLE_PAIRING) {
     }
 }
 
-!NoSerialBuild {
+!contains(DEFINES, NO_SERIAL_LINK) {
 HEADERS += \
     src/comm/QGCSerialPortInfo.h \
     src/comm/SerialLink.h \
@@ -894,6 +908,7 @@ SOURCES += \
     src/Geo/PolarStereographic.cpp \
     src/QGC.cc \
     src/QGCApplication.cc \
+    src/QGCCachedFileDownload.cc \
     src/QGCComboBox.cc \
     src/QGCFileDownload.cc \
     src/QGCLoggingCategory.cc \
@@ -925,6 +940,7 @@ SOURCES += \
     src/Settings/AppSettings.cc \
     src/Settings/AutoConnectSettings.cc \
     src/Settings/BrandImageSettings.cc \
+    src/Settings/RemoteIDSettings.cc \
     src/Settings/FirmwareUpgradeSettings.cc \
     src/Settings/FlightMapSettings.cc \
     src/Settings/FlyViewSettings.cc \
@@ -954,16 +970,19 @@ SOURCES += \
     src/Vehicle/CompInfoGeneral.cc \
     src/Vehicle/ComponentInformationCache.cc \
     src/Vehicle/ComponentInformationManager.cc \
+    src/Vehicle/ComponentInformationTranslation.cc \
     src/Vehicle/EventHandler.cc \
     src/Vehicle/FTPManager.cc \
     src/Vehicle/GPSRTKFactGroup.cc \
-    src/Vehicle/HealthAndArmingChecks.cc \
+    src/Vehicle/HealthAndArmingCheckReport.cc \
     src/Vehicle/ImageProtocolManager.cc \
     src/Vehicle/InitialConnectStateMachine.cc \
     src/Vehicle/MAVLinkLogManager.cc \
     src/Vehicle/MAVLinkStreamConfig.cc \
     src/Vehicle/MultiVehicleManager.cc \
+    src/Vehicle/RemoteIDManager.cc \
     src/Vehicle/StateMachine.cc \
+    src/Vehicle/StandardModes.cc \
     src/Vehicle/SysStatusSensorInfo.cc \
     src/Vehicle/TerrainFactGroup.cc \
     src/Vehicle/TerrainProtocolHandler.cc \
@@ -983,6 +1002,8 @@ SOURCES += \
     src/Vehicle/VehicleTemperatureFactGroup.cc \
     src/Vehicle/VehicleVibrationFactGroup.cc \
     src/Vehicle/VehicleHygrometerFactGroup.cc \
+    src/Vehicle/VehicleGeneratorFactGroup.cc \
+    src/Vehicle/VehicleEFIFactGroup.cc \
     src/Vehicle/VehicleWindFactGroup.cc \
     src/VehicleSetup/JoystickConfigController.cc \
     src/comm/LinkConfiguration.cc \
@@ -1012,7 +1033,7 @@ SOURCES += \
     src/comm/MockLinkMissionItemHandler.cc \
 }
 
-!NoSerialBuild {
+!contains(DEFINES, NO_SERIAL_LINK) {
 SOURCES += \
     src/comm/QGCSerialPortInfo.cc \
     src/comm/SerialLink.cc \
@@ -1067,7 +1088,7 @@ HEADERS+= \
     src/FirmwarePlugin/FirmwarePluginManager.h \
     src/VehicleSetup/VehicleComponent.h \
 
-!MobileBuild { !NoSerialBuild {
+!MobileBuild { !contains(DEFINES, NO_SERIAL_LINK) {
     HEADERS += \
         src/VehicleSetup/Bootloader.h \
         src/VehicleSetup/FirmwareImage.h \
@@ -1089,7 +1110,7 @@ SOURCES += \
     src/FirmwarePlugin/FirmwarePluginManager.cc \
     src/VehicleSetup/VehicleComponent.cc \
 
-!MobileBuild { !NoSerialBuild {
+!MobileBuild { !contains(DEFINES, NO_SERIAL_LINK) {
     SOURCES += \
         src/VehicleSetup/Bootloader.cc \
         src/VehicleSetup/FirmwareImage.cc \
@@ -1121,7 +1142,6 @@ APMFirmwarePlugin {
         src/AutoPilotPlugins/APM/APMAirframeComponentController.h \
         src/AutoPilotPlugins/APM/APMAutoPilotPlugin.h \
         src/AutoPilotPlugins/APM/APMCameraComponent.h \
-        src/AutoPilotPlugins/APM/APMCompassCal.h \
         src/AutoPilotPlugins/APM/APMFlightModesComponent.h \
         src/AutoPilotPlugins/APM/APMFlightModesComponentController.h \
         src/AutoPilotPlugins/APM/APMFollowComponent.h \
@@ -1137,6 +1157,7 @@ APMFirmwarePlugin {
         src/AutoPilotPlugins/APM/APMSensorsComponentController.h \
         src/AutoPilotPlugins/APM/APMSubMotorComponentController.h \
         src/AutoPilotPlugins/APM/APMTuningComponent.h \
+        src/AutoPilotPlugins/APM/APMRemoteSupportComponent.h \
         src/FirmwarePlugin/APM/APMFirmwarePlugin.h \
         src/FirmwarePlugin/APM/APMParameterMetaData.h \
         src/FirmwarePlugin/APM/ArduCopterFirmwarePlugin.h \
@@ -1149,7 +1170,6 @@ APMFirmwarePlugin {
         src/AutoPilotPlugins/APM/APMAirframeComponentController.cc \
         src/AutoPilotPlugins/APM/APMAutoPilotPlugin.cc \
         src/AutoPilotPlugins/APM/APMCameraComponent.cc \
-        src/AutoPilotPlugins/APM/APMCompassCal.cc \
         src/AutoPilotPlugins/APM/APMFlightModesComponent.cc \
         src/AutoPilotPlugins/APM/APMFlightModesComponentController.cc \
         src/AutoPilotPlugins/APM/APMFollowComponent.cc \
@@ -1165,6 +1185,7 @@ APMFirmwarePlugin {
         src/AutoPilotPlugins/APM/APMSensorsComponentController.cc \
         src/AutoPilotPlugins/APM/APMSubMotorComponentController.cc \
         src/AutoPilotPlugins/APM/APMTuningComponent.cc \
+        src/AutoPilotPlugins/APM/APMRemoteSupportComponent.cc \
         src/FirmwarePlugin/APM/APMFirmwarePlugin.cc \
         src/FirmwarePlugin/APM/APMParameterMetaData.cc \
         src/FirmwarePlugin/APM/ArduCopterFirmwarePlugin.cc \
@@ -1194,7 +1215,6 @@ PX4FirmwarePlugin {
         src/AutoPilotPlugins/PX4/AirframeComponentController.h \
         src/AutoPilotPlugins/PX4/CameraComponent.h \
         src/AutoPilotPlugins/PX4/FlightModesComponent.h \
-        src/AutoPilotPlugins/PX4/PX4AdvancedFlightModesController.h \
         src/AutoPilotPlugins/PX4/PX4AirframeLoader.h \
         src/AutoPilotPlugins/PX4/PX4AutoPilotPlugin.h \
         src/AutoPilotPlugins/PX4/PX4FlightBehavior.h \
@@ -1216,7 +1236,6 @@ PX4FirmwarePlugin {
         src/AutoPilotPlugins/PX4/AirframeComponentController.cc \
         src/AutoPilotPlugins/PX4/CameraComponent.cc \
         src/AutoPilotPlugins/PX4/FlightModesComponent.cc \
-        src/AutoPilotPlugins/PX4/PX4AdvancedFlightModesController.cc \
         src/AutoPilotPlugins/PX4/PX4AirframeLoader.cc \
         src/AutoPilotPlugins/PX4/PX4AutoPilotPlugin.cc \
         src/AutoPilotPlugins/PX4/PX4FlightBehavior.cc \
@@ -1330,123 +1349,6 @@ contains (DEFINES, QGC_GST_MICROHARD_DISABLED) {
             src/Microhard/MicrohardHandler.cc \
             src/Microhard/MicrohardSettings.cc \
     }
-}
-#-------------------------------------------------------------------------------------
-# AirMap
-
-contains (DEFINES, QGC_AIRMAP_ENABLED) {
-
-    #-- These should be always enabled but not yet
-    INCLUDEPATH += \
-        src/AirspaceManagement
-
-    HEADERS += \
-        src/AirspaceManagement/AirspaceAdvisoryProvider.h \
-        src/AirspaceManagement/AirspaceFlightPlanProvider.h \
-        src/AirspaceManagement/AirspaceManager.h \
-        src/AirspaceManagement/AirspaceRestriction.h \
-        src/AirspaceManagement/AirspaceRestrictionProvider.h \
-        src/AirspaceManagement/AirspaceRulesetsProvider.h \
-        src/AirspaceManagement/AirspaceVehicleManager.h \
-        src/AirspaceManagement/AirspaceWeatherInfoProvider.h \
-
-    SOURCES += \
-        src/AirspaceManagement/AirspaceAdvisoryProvider.cc \
-        src/AirspaceManagement/AirspaceFlightPlanProvider.cc \
-        src/AirspaceManagement/AirspaceManager.cc \
-        src/AirspaceManagement/AirspaceRestriction.cc \
-        src/AirspaceManagement/AirspaceRestrictionProvider.cc \
-        src/AirspaceManagement/AirspaceRulesetsProvider.cc \
-        src/AirspaceManagement/AirspaceVehicleManager.cc \
-        src/AirspaceManagement/AirspaceWeatherInfoProvider.cc \
-
-    #-- This is the AirMap implementation of the above
-    RESOURCES += \
-        src/Airmap/airmap.qrc
-
-    INCLUDEPATH += \
-        src/Airmap \
-        src/Airmap/services
-
-    HEADERS += \
-        src/Airmap/AirMapAdvisoryManager.h \
-        src/Airmap/AirMapFlightManager.h \
-        src/Airmap/AirMapFlightPlanManager.h \
-        src/Airmap/AirMapManager.h \
-        src/Airmap/AirMapRestrictionManager.h \
-        src/Airmap/AirMapRulesetsManager.h \
-        src/Airmap/AirMapSettings.h \
-        src/Airmap/AirMapSharedState.h \
-        src/Airmap/AirMapTelemetry.h \
-        src/Airmap/AirMapTrafficMonitor.h \
-        src/Airmap/AirMapVehicleManager.h \
-        src/Airmap/AirMapWeatherInfoManager.h \
-        src/Airmap/LifetimeChecker.h \
-        src/Airmap/services/advisory.h \
-        src/Airmap/services/aircrafts.h \
-        src/Airmap/services/airspaces.h \
-        src/Airmap/services/authenticator.h \
-        src/Airmap/services/client.h \
-        src/Airmap/services/dispatcher.h \
-        src/Airmap/services/flight_plans.h \
-        src/Airmap/services/flights.h \
-        src/Airmap/services/logger.h \
-        src/Airmap/services/pilots.h \
-        src/Airmap/services/rulesets.h \
-        src/Airmap/services/status.h \
-        src/Airmap/services/telemetry.h \
-        src/Airmap/services/traffic.h \
-        src/Airmap/services/types.h \
-
-    SOURCES += \
-        src/Airmap/AirMapAdvisoryManager.cc \
-        src/Airmap/AirMapFlightManager.cc \
-        src/Airmap/AirMapFlightPlanManager.cc \
-        src/Airmap/AirMapManager.cc \
-        src/Airmap/AirMapRestrictionManager.cc \
-        src/Airmap/AirMapRulesetsManager.cc \
-        src/Airmap/AirMapSettings.cc \
-        src/Airmap/AirMapSharedState.cc \
-        src/Airmap/AirMapTelemetry.cc \
-        src/Airmap/AirMapTrafficMonitor.cc \
-        src/Airmap/AirMapVehicleManager.cc \
-        src/Airmap/AirMapWeatherInfoManager.cc \
-        src/Airmap/services/advisory.cpp \
-        src/Airmap/services/aircrafts.cpp \
-        src/Airmap/services/airspaces.cpp \
-        src/Airmap/services/authenticator.cpp \
-        src/Airmap/services/client.cpp \
-        src/Airmap/services/dispatcher.cpp \
-        src/Airmap/services/flight_plans.cpp \
-        src/Airmap/services/flights.cpp \
-        src/Airmap/services/logger.cpp \
-        src/Airmap/services/pilots.cpp \
-        src/Airmap/services/rulesets.cpp \
-        src/Airmap/services/status.cpp \
-        src/Airmap/services/telemetry.cpp \
-        src/Airmap/services/traffic.cpp \
-        src/Airmap/services/types.cpp \
-
-    #-- Do we have an API key?
-    exists(src/Airmap/Airmap_api_key.h) {
-        message("Using compile time Airmap API key")
-        HEADERS += \
-            src/Airmap/Airmap_api_key.h
-        DEFINES += QGC_AIRMAP_KEY_AVAILABLE
-    }
-
-    include(src/Airmap/QJsonWebToken/src/qjsonwebtoken.pri)
-
-} else {
-    #-- Dummies
-    INCLUDEPATH += \
-        src/Airmap/dummy
-    RESOURCES += \
-        src/Airmap/dummy/airmap_dummy.qrc
-    HEADERS += \
-        src/Airmap/dummy/AirspaceManager.h
-    SOURCES += \
-        src/Airmap/dummy/AirspaceManager.cc
 }
 
 #-------------------------------------------------------------------------------------

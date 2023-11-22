@@ -18,8 +18,6 @@ import QtQuick.Window           2.2
 import QtQml.Models             2.1
 
 import QGroundControl               1.0
-import QGroundControl.Airspace      1.0
-import QGroundControl.Airmap        1.0
 import QGroundControl.Controllers   1.0
 import QGroundControl.Controls      1.0
 import QGroundControl.FactSystem    1.0
@@ -51,7 +49,8 @@ Item {
     property real   _margins:               ScreenTools.defaultFontPixelWidth / 2
     property var    _guidedController:      guidedActionsController
     property var    _guidedActionList:      guidedActionList
-    property var    _guidedAltSlider:       guidedAltSlider
+    property var    _guidedValueSlider:     guidedValueSlider
+    property var    _widgetLayer:           widgetLayer
     property real   _toolsMargin:           ScreenTools.defaultFontPixelWidth * 0.75
     property rect   _centerViewport:        Qt.rect(0, 0, width, height)
     property real   _rightPanelWidth:       ScreenTools.defaultFontPixelWidth * 30
@@ -79,12 +78,13 @@ Item {
         anchors.top:            parent.top
         anchors.bottom:         parent.bottom
         anchors.left:           parent.left
-        anchors.right:          guidedAltSlider.visible ? guidedAltSlider.left : parent.right
+        anchors.right:          guidedValueSlider.visible ? guidedValueSlider.left : parent.right
         z:                      _fullItemZorder + 1
         parentToolInsets:       _toolInsets
         mapControl:             _mapControl
         visible:                !QGroundControl.videoManager.fullScreen
     }
+
 
     FlyViewCustomLayer {
         id:                 customOverlay
@@ -95,11 +95,25 @@ Item {
         visible:            !QGroundControl.videoManager.fullScreen
     }
 
+    // Development tool for visualizing the insets for a paticular layer, enable if needed
+    /*
+    FlyViewInsetViewer {
+        id:                     widgetLayerInsetViewer
+        anchors.top:            parent.top
+        anchors.bottom:         parent.bottom
+        anchors.left:           parent.left
+        anchors.right:          guidedValueSlider.visible ? guidedValueSlider.left : parent.right
+
+        z:                      widgetLayer.z + 1
+
+        insetsToView:           customOverlay.totalToolInsets
+    }*/
+
     GuidedActionsController {
         id:                 guidedActionsController
         missionController:  _missionController
         actionList:         _guidedActionList
-        altitudeSlider:     _guidedAltSlider
+        guidedValueSlider:     _guidedValueSlider
     }
 
     /*GuidedActionConfirm {
@@ -109,7 +123,7 @@ Item {
         anchors.horizontalCenter:   parent.horizontalCenter
         z:                          QGroundControl.zOrderTopMost
         guidedController:           _guidedController
-        altitudeSlider:             _guidedAltSlider
+        guidedValueSlider:             _guidedValueSlider
     }*/
 
     GuidedActionList {
@@ -121,9 +135,9 @@ Item {
         guidedController:           _guidedController
     }
 
-    //-- Altitude slider
-    GuidedAltitudeSlider {
-        id:                 guidedAltSlider
+    //-- Guided value slider (e.g. altitude)
+    GuidedValueSlider {
+        id:                 guidedValueSlider
         anchors.margins:    _toolsMargin
         anchors.right:      parent.right
         anchors.top:        parent.top

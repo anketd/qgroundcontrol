@@ -6,7 +6,7 @@ include(GNUInstallDirs)
 
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug;Release;RelWithDebInfo;MinSizeRel;Coverage")
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
@@ -164,7 +164,7 @@ include_directories(
 	libs/libevents
 
 	libs/mavlink/include/mavlink/v2.0
-	libs/mavlink/include/mavlink/v2.0/ardupilotmega
+	libs/mavlink/include/mavlink/v2.0/all
 	libs/mavlink/include/mavlink/v2.0/common
 
 	libs/shapelib
@@ -178,8 +178,6 @@ set(QGC_RESOURCES
 	${CMAKE_CURRENT_SOURCE_DIR}/qgcresources.qrc
 	${CMAKE_CURRENT_SOURCE_DIR}/qgroundcontrol.qrc
 	${CMAKE_CURRENT_SOURCE_DIR}/resources/InstrumentValueIcons/InstrumentValueIcons.qrc
-	${CMAKE_CURRENT_SOURCE_DIR}/src/Airmap/airmap.qrc
-	${CMAKE_CURRENT_SOURCE_DIR}/src/Airmap/dummy/airmap_dummy.qrc
 	${CMAKE_CURRENT_SOURCE_DIR}/src/FirmwarePlugin/APM/APMResources.qrc
 	${CMAKE_CURRENT_SOURCE_DIR}/src/FirmwarePlugin/PX4/PX4Resources.qrc
 	${CMAKE_CURRENT_SOURCE_DIR}/VideoReceiverApp/qml.qrc

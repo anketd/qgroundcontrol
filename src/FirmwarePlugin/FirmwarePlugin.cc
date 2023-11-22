@@ -275,6 +275,20 @@ void FirmwarePlugin::guidedModeChangeAltitude(Vehicle*, double, bool pauseVehicl
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
 }
 
+void
+FirmwarePlugin::guidedModeChangeGroundSpeedMetersSecond(Vehicle*, double)
+{
+    // Not supported by generic vehicle
+    qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
+}
+
+void
+FirmwarePlugin::guidedModeChangeEquivalentAirspeedMetersSecond(Vehicle*, double)
+{
+    // Not supported by generic vehicle
+    qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
+}
+
 void FirmwarePlugin::startMission(Vehicle*)
 {
     // Not supported by generic vehicle
@@ -318,6 +332,7 @@ const QVariantList& FirmwarePlugin::toolIndicators(const Vehicle*)
             QVariant::fromValue(QUrl::fromUserInput("qrc:/toolbar/TelemetryRSSIIndicator.qml")),
             QVariant::fromValue(QUrl::fromUserInput("qrc:/toolbar/RCRSSIIndicator.qml")),
             QVariant::fromValue(QUrl::fromUserInput("qrc:/toolbar/BatteryIndicator.qml")),
+            QVariant::fromValue(QUrl::fromUserInput("qrc:/toolbar/RemoteIDIndicator.qml")),
         });
     }
     return _toolIndicatorList;
@@ -536,6 +551,22 @@ const QVariantList& FirmwarePlugin::cameraList(const Vehicle*)
                     0.2,                // minimum trigger interval
                     tr(""),             // SHOULD BE BLANK FOR NEWLY ADDED CAMERAS. Deprecated translation from older builds.
                     this);              // parent
+        _cameraList.append(QVariant::fromValue(metaData));
+
+        metaData = new CameraMetaData(
+                    "Sentera 65R Sensor",
+                    tr("Sentera"),
+                    tr("65R Sensor"),
+                    29.9,                // sensorWidth
+                    22.4,                // sendsorHeight
+                    9344,                // imageWidth
+                    7000,                // imageHeight
+                    27.4,                // focalLength
+                    true,                // landscape
+                    false,               // fixedOrientation
+                    0.3,                 // minTriggerInterval
+                    tr(""),              // SHOULD BE BLANK FOR NEWLY ADDED CAMERAS. Deprecated translation from older builds.
+                    this);               // parent
         _cameraList.append(QVariant::fromValue(metaData));
 
         metaData = new CameraMetaData(
@@ -918,8 +949,8 @@ bool FirmwarePlugin::_armVehicleAndValidate(Vehicle* vehicle)
     // Only try arming the vehicle a single time. Doing retries on arming with a delay can lead to safety issues.
     vehicle->setArmed(true, false /* showError */);
 
-    // Wait 1000 msecs for vehicle to arm
-    for (int i=0; i<10; i++) {
+    // Wait 1500 msecs for vehicle to arm (waiting for the next heartbeat)
+    for (int i = 0; i < 15; i++) {
         if (vehicle->armed()) {
             vehicleArmed = true;
             break;

@@ -181,6 +181,77 @@ Rectangle {
                                 property Fact _showDumbCameraControl: QGroundControl.settingsManager.flyViewSettings.showSimpleCameraControl
                             }
 
+                            FactCheckBox {
+                                text:       qsTr("Update home position based on device location. This will affect return to home")
+                                fact:       _updateHomePosition
+                                visible:    _updateHomePosition.visible
+                                property Fact _updateHomePosition: QGroundControl.settingsManager.flyViewSettings.updateHomePosition
+                            }
+
+                            FactCheckBox {
+                                text:       qsTr("Enable Custom Actions")
+                                visible:    _enableCustomActions.visible
+                                fact:       _enableCustomActions
+
+                                property Fact _enableCustomActions: QGroundControl.settingsManager.flyViewSettings.enableCustomActions
+                            }
+
+                            //-----------------------------------------------------------------
+                            //-- CustomAction definition path
+                            GridLayout {
+                                id: customActions
+
+                                columns:  2
+                                visible:  QGroundControl.settingsManager.flyViewSettings.enableCustomActions.rawValue
+
+                                onVisibleChanged: {
+                                    if (jsonFile.rawValue === "" && ScreenTools.isMobile) {
+                                        jsonFile.rawValue = _defaultFile
+                                    }
+                                }
+
+                                property Fact   jsonFile:     QGroundControl.settingsManager.flyViewSettings.customActionDefinitions
+                                property string _defaultDir:  QGroundControl.settingsManager.appSettings.customActionsSavePath
+                                property string _defaultFile: _defaultDir + "/CustomActions.json"
+
+                                QGCLabel {
+                                    text: qsTr("Custom Action Definitions")
+
+                                    Layout.columnSpan:  2
+                                    Layout.alignment:   Qt.AlignHCenter
+                                }
+
+                                QGCTextField {
+                                    Layout.fillWidth:   true
+                                    readOnly:           true
+                                    text:               customActions.jsonFile.rawValue === "" ? qsTr("<not set>") : customActions.jsonFile.rawValue
+                                }
+                                QGCButton {
+                                    visible:    !ScreenTools.isMobile
+                                    text:       qsTr("Browse")
+                                    onClicked:  customActionPathBrowseDialog.openForLoad()
+                                    QGCFileDialog {
+                                        id:             customActionPathBrowseDialog
+                                        title:          qsTr("Choose the Custom Action Definitions file")
+                                        folder:         customActions.jsonFile.rawValue
+                                        selectExisting: true
+                                        selectFolder:   false
+                                        onAcceptedForLoad: customActions.jsonFile.rawValue = file
+                                        nameFilters: ["JSON files (*.json)"]
+                                    }
+                                }
+                                // The file loader on Android doesn't work, so we hard code the path to the
+                                // JSON file. However, we need a button to force a refresh if the JSON file
+                                // is changed.
+                                QGCButton {
+                                    visible:    ScreenTools.isMobile
+                                    text:       qsTr("Reload")
+                                    onClicked:  {
+                                        customActions.jsonFile.valueChanged(customActions.jsonFile.rawValue)
+                                    }
+                                }
+                            }
+
                             GridLayout {
                                 columns: 2
 
@@ -293,7 +364,7 @@ Rectangle {
 
                                 QGCLabel {
                                     id:         videoFileFormatLabel
-                                    text:       qsTr("File Format")
+                                    text:       qsTr("Record File Format")
                                     visible:    _showSaveVideoSettings && _videoSettings.recordingFormat.visible
                                 }
                                 FactComboBox {
@@ -615,6 +686,13 @@ Rectangle {
                                 }
 
                                 FactCheckBox {
+                                    text:       qsTr("Save application data to SD Card")
+                                    fact:       _androidSaveToSDCard
+                                    visible:    _androidSaveToSDCard.visible
+                                    property Fact _androidSaveToSDCard: QGroundControl.settingsManager.appSettings.androidSaveToSDCard
+                                }
+
+                                FactCheckBox {
                                     text:       qsTr("Check for Internet connection")
                                     fact:       _checkInternet
                                     visible:    _checkInternet && _checkInternet.visible
@@ -645,11 +723,17 @@ Rectangle {
                                         }
                                     }
                                 }
+
+                                // Check box to show/hide Remote ID submenu in App settings
+                                FactCheckBox {
+                                    text:       qsTr("Enable Remote ID")
+                                    fact:       _remoteIDEnable
+                                    visible:    _remoteIDEnable.visible
+                                    property Fact _remoteIDEnable: QGroundControl.settingsManager.remoteIDSettings.enable
+                                }
                             }
                         }
 
-                        //-----------------------------------------------------------------
-                        //-- Save path
                         RowLayout {
                             id:                 pathRow
                             anchors.margins:    _margins
@@ -815,7 +899,7 @@ Rectangle {
                                     visible:                nmeaPortCombo.currentText !== gpsUdpPort && nmeaPortCombo.currentText !== gpsDisabled
                                     id:                     nmeaBaudCombo
                                     Layout.preferredWidth:  _comboFieldWidth
-                                    model:                  [4800, 9600, 19200, 38400, 57600, 115200]
+                                    model:                  [1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600]
 
                                     onActivated: {
                                         if (index != -1) {
@@ -1023,7 +1107,7 @@ Rectangle {
                             FactTextField {
                                 fact:                   adsbGrid.adsbSettings.adsbServerHostAddress
                                 visible:                adsbGrid.adsbSettings.adsbServerHostAddress.visible
-                                Layout.preferredWidth:  _valueFieldWidth
+                                Layout.fillWidth:       true
                             }
 
                             QGCLabel {

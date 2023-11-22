@@ -8,7 +8,6 @@ add_library(AutoPilotPlugins
 	APM/APMAirframeComponentController.cc
 	APM/APMAutoPilotPlugin.cc
 	APM/APMCameraComponent.cc
-	APM/APMCompassCal.cc
 	APM/APMFlightModesComponent.cc
 	APM/APMFlightModesComponentController.cc
 	APM/APMFollowComponent.cc
@@ -18,6 +17,7 @@ add_library(AutoPilotPlugins
 	APM/APMMotorComponent.cc
 	APM/APMPowerComponent.cc
 	APM/APMRadioComponent.cc
+	APM/APMRemoteSupportComponent.cc
 	APM/APMSafetyComponent.cc
 	APM/APMSensorsComponent.cc
 	APM/APMSensorsComponentController.cc
@@ -50,8 +50,6 @@ add_library(AutoPilotPlugins
 	PX4/PowerComponentController.cc
 	PX4/PowerComponentController.h
 	PX4/PowerComponent.h
-	PX4/PX4AdvancedFlightModesController.cc
-	PX4/PX4AdvancedFlightModesController.h
 	PX4/PX4AirframeLoader.cc
 	PX4/PX4AirframeLoader.h
 	PX4/PX4AutoPilotPlugin.cc

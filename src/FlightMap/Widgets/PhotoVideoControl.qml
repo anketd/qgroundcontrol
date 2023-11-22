@@ -25,7 +25,7 @@ import QGroundControl.FactControls      1.0
 
 Rectangle {
     height:     mainLayout.height + (_margins * 2)
-    color:      "#80000000"
+    color:      Qt.rgba(qgcPal.window.r, qgcPal.window.g, qgcPal.window.b, 0.5)
     radius:     _margins
     visible:    (_mavlinkCamera || _videoStreamAvailable || _simpleCameraAvailable) && multiVehiclePanelSelector.showSingleVehiclePanel
 
@@ -101,7 +101,19 @@ Rectangle {
 
     function toggleShooting() {
         console.log("toggleShooting", _anyVideoStreamAvailable)
-        if (_mavlinkCamera && _mavlinkCamera.capturesVideo) {
+
+        // This whole mavlinkCameraCaptureVideoOrPhotos stuff is to work around some strange qml boolean testing 
+        // behavior which wasn't working correctly. This should work:
+        //    if (_mavlinkCamera && (_mavlinkCamera.capturesVideo || _mavlinkCamera.capturesPhotos) ) {
+        // but it doesn't for some strange reason. Hence all the stuff below...
+        var mavlinkCameraCaptureVideoOrPhotos = false
+        if (_mavlinkCamera) {
+            if (_mavlinkCamera.capturesVideo || _mavlinkCamera.capturesPhotos) {
+                mavlinkCameraCaptureVideoOrPhotos = true
+            }
+        }
+        
+        if (mavlinkCameraCaptureVideoOrPhotos) {
             if(_mavlinkCameraInVideoMode) {
                 _mavlinkCamera.toggleVideo()
             } else {
@@ -153,7 +165,7 @@ Rectangle {
 
         QGCMouseArea {
             fillItem:   parent
-            onClicked:  mainWindow.showPopupDialogFromComponent(settingsDialogComponent)
+            onClicked:  settingsDialogComponent.createObject(mainWindow).open()
         }
     }
 

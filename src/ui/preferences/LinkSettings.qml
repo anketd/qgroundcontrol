@@ -78,6 +78,7 @@ Rectangle {
                     onClicked: {
                         checked = true
                         _currentSelection = object
+                        console.log("clicked", object, object.link)
                     }
                 }
             }
@@ -129,12 +130,20 @@ Rectangle {
         QGCButton {
             text:       qsTr("Disconnect")
             enabled:    _currentSelection && _currentSelection.link
-            onClicked:  _currentSelection.link.disconnect()
+            onClicked:  {
+                _currentSelection.link.disconnect()
+                _currentSelection.linkChanged()
+            }
         }
         QGCButton {
             text:       qsTr("MockLink Options")
             visible:    _currentSelection && _currentSelection.link && _currentSelection.link.isMockLink
-            onClicked:  mainWindow.showPopupDialogFromSource("qrc:/unittest/MockLinkOptionsDlg.qml", { link: _currentSelection.link })
+            onClicked:  mockLinkOptionDialog.open()
+
+            MockLinkOptionsDlg {
+                id:     mockLinkOptionDialog
+                link:   _currentSelection ? _currentSelection.link : undefined
+            }
         }
     }
 

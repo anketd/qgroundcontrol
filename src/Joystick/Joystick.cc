@@ -19,7 +19,7 @@
 
 #include <QSettings>
 
-QGC_LOGGING_CATEGORY(JoystickLog,       "JoystickLog")
+// JoystickLog Category declaration moved to QGCLoggingCategory.cc to allow access in Vehicle
 QGC_LOGGING_CATEGORY(JoystickValuesLog, "JoystickValuesLog")
 
 const char* Joystick::_settingsGroup =                  "Joysticks";
@@ -65,6 +65,8 @@ const char* Joystick::_buttonActionGimbalLeft =         QT_TR_NOOP("Gimbal Left"
 const char* Joystick::_buttonActionGimbalRight =        QT_TR_NOOP("Gimbal Right");
 const char* Joystick::_buttonActionGimbalCenter =       QT_TR_NOOP("Gimbal Center");
 const char* Joystick::_buttonActionEmergencyStop =      QT_TR_NOOP("Emergency Stop");
+const char* Joystick::_buttonActionGripperGrab =        QT_TR_NOOP("Gripper Close");
+const char* Joystick::_buttonActionGripperRelease =     QT_TR_NOOP("Gripper Open");
 
 const char* Joystick::_rgFunctionSettingsKey[Joystick::maxFunction] = {
     "RollAxis",
@@ -106,6 +108,8 @@ Joystick::Joystick(const QString& name, int axisCount, int buttonCount, int hatC
     , _totalButtonCount(_buttonCount+_hatButtonCount)
     , _multiVehicleManager(multiVehicleManager)
 {
+    qRegisterMetaType<GRIPPER_ACTIONS>();
+
     _rgAxisValues   = new int[static_cast<size_t>(_axisCount)];
     _rgCalibration  = new Calibration_t[static_cast<size_t>(_axisCount)];
     _rgButtonValues = new uint8_t[static_cast<size_t>(_totalButtonCount)];
@@ -120,6 +124,7 @@ Joystick::Joystick(const QString& name, int axisCount, int buttonCount, int hatC
     _updateTXModeSettingsKey(_multiVehicleManager->activeVehicle());
     _loadSettings();
     connect(_multiVehicleManager, &MultiVehicleManager::activeVehicleChanged, this, &Joystick::_activeVehicleChanged);
+    connect(qgcApp()->toolbox()->multiVehicleManager()->vehicles(), &QmlObjectListModel::countChanged, this, &Joystick::_vehicleCountChanged);
 
     _customMavCommands = JoystickMavCommand::load("JoystickMavCommands.json");
 }
@@ -215,6 +220,20 @@ void Joystick::_activeVehicleChanged(Vehicle* activeVehicle)
         settings.beginGroup(_settingsGroup);
         int mode = settings.value(_txModeSettingsKey, activeVehicle->firmwarePlugin()->defaultJoystickTXMode()).toInt();
         setTXMode(mode);
+    }
+}
+void Joystick::_flightModesChanged()
+{
+    _buildActionList(_activeVehicle);
+}
+
+void Joystick::_vehicleCountChanged(int count)
+{
+    if(count == 0)
+    {
+        // then the last vehicle has been deleted
+        qCDebug(JoystickLog) << "Stopping joystick thread due to last active vehicle deletion";
+        this->stopPolling();
     }
 }
 
@@ -486,7 +505,9 @@ void Joystick::run()
     while (!_exitThread) {
         _update();
         _handleButtons();
-        _handleAxis();
+        if (axisCount() != 0) {
+            _handleAxis();
+        }
         QGC::SLEEP::msleep(qMin(static_cast<int>(1000.0f / _maxAxisFrequencyHz), static_cast<int>(1000.0f / _maxButtonFrequencyHz)) / 2);
     }
     _close();
@@ -699,11 +720,13 @@ void Joystick::startPolling(Vehicle* vehicle)
             disconnect(this, &Joystick::centerGimbal,       _activeVehicle, &Vehicle::centerGimbal);
             disconnect(this, &Joystick::gimbalControlValue, _activeVehicle, &Vehicle::gimbalControlValue);
             disconnect(this, &Joystick::emergencyStop,      _activeVehicle, &Vehicle::emergencyStop);
+            disconnect(this, &Joystick::gripperAction,      _activeVehicle, &Vehicle::setGripperAction);
+            disconnect(_activeVehicle, &Vehicle::flightModesChanged, this, &Joystick::_flightModesChanged);
         }
         // Always set up the new vehicle
         _activeVehicle = vehicle;
         // If joystick is not calibrated, disable it
-        if ( !_calibrated ) {
+        if ( axisCount() != 0 && !_calibrated ) {
             vehicle->setJoystickEnabled(false);
         }
         // Update qml in case of joystick transition
@@ -721,6 +744,8 @@ void Joystick::startPolling(Vehicle* vehicle)
             connect(this, &Joystick::centerGimbal,       _activeVehicle, &Vehicle::centerGimbal);
             connect(this, &Joystick::gimbalControlValue, _activeVehicle, &Vehicle::gimbalControlValue);
             connect(this, &Joystick::emergencyStop,      _activeVehicle, &Vehicle::emergencyStop);
+            connect(this, &Joystick::gripperAction,      _activeVehicle, &Vehicle::setGripperAction);
+            connect(_activeVehicle, &Vehicle::flightModesChanged, this, &Joystick::_flightModesChanged);
         }
     }
     if (!isRunning()) {
@@ -740,6 +765,8 @@ void Joystick::stopPolling(void)
             disconnect(this, &Joystick::gimbalYawStep,      _activeVehicle, &Vehicle::gimbalYawStep);
             disconnect(this, &Joystick::centerGimbal,       _activeVehicle, &Vehicle::centerGimbal);
             disconnect(this, &Joystick::gimbalControlValue, _activeVehicle, &Vehicle::gimbalControlValue);
+            disconnect(this, &Joystick::gripperAction,      _activeVehicle, &Vehicle::setGripperAction);
+            disconnect(_activeVehicle, &Vehicle::flightModesChanged, this, &Joystick::_flightModesChanged);
         }
         _exitThread = true;
     }
@@ -946,8 +973,8 @@ void Joystick::setCircleCorrection(bool circleCorrection)
 void Joystick::setAxisFrequency(float val)
 {
     //-- Arbitrary limits
-    val = qMin(_minAxisFrequencyHz, val);
-    val = qMax(_maxAxisFrequencyHz, val);
+    val = qMax(_minAxisFrequencyHz, val);
+    val = qMin(_maxAxisFrequencyHz, val);
     _axisFrequencyHz = val;
     _saveSettings();
     emit axisFrequencyHzChanged();
@@ -956,8 +983,8 @@ void Joystick::setAxisFrequency(float val)
 void Joystick::setButtonFrequency(float val)
 {
     //-- Arbitrary limits
-    val = qMin(_minButtonFrequencyHz, val);
-    val = qMax(_maxButtonFrequencyHz, val);
+    val = qMax(_minButtonFrequencyHz, val);
+    val = qMin(_maxButtonFrequencyHz, val);
     _buttonFrequencyHz = val;
     _saveSettings();
     emit buttonFrequencyHzChanged();
@@ -991,7 +1018,7 @@ void Joystick::_executeButtonAction(const QString& action, bool buttonDown)
         if (buttonDown) emit setVtolInFwdFlight(true);
     } else if (action == _buttonActionVTOLMultiRotor) {
         if (buttonDown) emit setVtolInFwdFlight(false);
-    } else if (_activeVehicle->flightModes().contains(action) || _activeVehicle->extraJoystickFlightModes().contains(action)) {
+    } else if (_activeVehicle->flightModes().contains(action)) {
         if (buttonDown) emit setFlightMode(action);
     } else if(action == _buttonActionContinuousZoomIn || action == _buttonActionContinuousZoomOut) {
         if (buttonDown) {
@@ -1029,6 +1056,14 @@ void Joystick::_executeButtonAction(const QString& action, bool buttonDown)
         }
     } else if(action == _buttonActionEmergencyStop) {
       if(buttonDown) emit emergencyStop();
+    } else if(action == _buttonActionGripperGrab) {
+        if(buttonDown) {
+            emit gripperAction(GRIPPER_ACTION_GRAB);
+        }
+    } else if(action == _buttonActionGripperRelease) {
+        if(buttonDown) {
+            emit gripperAction(GRIPPER_ACTION_RELEASE);
+        }
     } else {
         if (buttonDown && _activeVehicle) {
             for (auto& item : _customMavCommands) {
@@ -1038,7 +1073,6 @@ void Joystick::_executeButtonAction(const QString& action, bool buttonDown)
                 }
             }
         }
-        qCDebug(JoystickLog) << "_buttonAction unknown action:" << action;
     }
 }
 
@@ -1101,10 +1135,6 @@ void Joystick::_buildActionList(Vehicle* activeVehicle)
         foreach(auto mode, list) {
             _assignableButtonActions.append(new AssignableButtonAction(this, mode));
         }
-        list = activeVehicle->extraJoystickFlightModes();
-        foreach(auto mode, list) {
-            _assignableButtonActions.append(new AssignableButtonAction(this, mode));
-        }
     }
     _assignableButtonActions.append(new AssignableButtonAction(this, _buttonActionVTOLFixedWing));
     _assignableButtonActions.append(new AssignableButtonAction(this, _buttonActionVTOLMultiRotor));
@@ -1126,8 +1156,12 @@ void Joystick::_buildActionList(Vehicle* activeVehicle)
     _assignableButtonActions.append(new AssignableButtonAction(this, _buttonActionGimbalRight,   true));
     _assignableButtonActions.append(new AssignableButtonAction(this, _buttonActionGimbalCenter));
     _assignableButtonActions.append(new AssignableButtonAction(this, _buttonActionEmergencyStop));
-    for (auto& item : _customMavCommands)
+    _assignableButtonActions.append(new AssignableButtonAction(this, _buttonActionGripperGrab));
+    _assignableButtonActions.append(new AssignableButtonAction(this, _buttonActionGripperRelease));
+
+    for (auto& item : _customMavCommands) {
         _assignableButtonActions.append(new AssignableButtonAction(this, item.name()));
+    }
 
     for(int i = 0; i < _assignableButtonActions.count(); i++) {
         AssignableButtonAction* p = qobject_cast<AssignableButtonAction*>(_assignableButtonActions[i]);

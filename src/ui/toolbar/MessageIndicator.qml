@@ -14,6 +14,7 @@ import QtQuick.Layouts  1.2
 
 import QGroundControl                       1.0
 import QGroundControl.Controls              1.0
+import QGroundControl.FactSystem            1.0
 import QGroundControl.MultiVehicleManager   1.0
 import QGroundControl.ScreenTools           1.0
 import QGroundControl.Palette               1.0
@@ -30,6 +31,10 @@ Item {
 
     property var    _activeVehicle:         QGroundControl.multiVehicleManager.activeVehicle
     property bool   _isMessageImportant:    _activeVehicle ? !_activeVehicle.messageTypeNormal && !_activeVehicle.messageTypeNone : false
+
+    function dropMessageIndicator() {
+        mainWindow.showIndicatorPopup(_root, vehicleMessagesPopup);
+    }
 
     function getMessageColor() {
         if (_activeVehicle) {
@@ -70,7 +75,7 @@ Item {
 
     MouseArea {
         anchors.fill:   parent
-        onClicked:      mainWindow.showIndicatorPopup(_root, vehicleMessagesPopup)
+        onClicked:      dropMessageIndicator()
     }
 
     Component {
@@ -95,7 +100,7 @@ Item {
                 //-- Hack to scroll to last message
                 for (var i = 0; i < _activeVehicle.messageCount; i++)
                     messageFlick.flick(0,-5000)
-                _activeVehicle.resetMessages()
+                _activeVehicle.resetAllMessages()
             }
 
             Connections {
@@ -138,6 +143,10 @@ Item {
                 }
             }
 
+            FactPanelController {
+                id: controller
+            }
+
             QGCFlickable {
                 id:                 messageFlick
                 anchors.margins:    ScreenTools.defaultFontPixelHeight
@@ -147,10 +156,34 @@ Item {
                 pixelAligned:       true
 
                 TextEdit {
-                    id:             messageText
-                    readOnly:       true
-                    textFormat:     TextEdit.RichText
-                    color:          qgcPal.text
+                    id:                 messageText
+                    readOnly:           true
+                    textFormat:         TextEdit.RichText
+                    selectByMouse:      true
+                    color:              qgcPal.text
+                    selectionColor:     qgcPal.text
+                    selectedTextColor:  qgcPal.window
+                    property var fact:  null
+                    onLinkActivated: {
+                        if (link.startsWith('param://')) {
+                            var paramName = link.substr(8);
+                            fact = controller.getParameterFact(-1, paramName, true)
+                            if (fact != null) {
+                                paramEditorDialogComponent.createObject(mainWindow).open()
+                            }
+                        } else {
+                            Qt.openUrlExternally(link);
+                        }
+                    }
+                }
+                Component {
+                    id: paramEditorDialogComponent
+
+                    ParameterEditorDialog {
+                        title:          qsTr("Edit Parameter")
+                        fact:           messageText.fact
+                        destroyOnClose: true
+                    }
                 }
             }
         }

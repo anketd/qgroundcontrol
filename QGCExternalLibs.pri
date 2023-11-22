@@ -54,7 +54,8 @@ isEmpty(MAVLINK_CONF) {
         MAVLINK_CONF = $$fromfile(user_config.pri, MAVLINK_CONF)
         message($$sprintf("Using user-supplied mavlink dialect '%1' specified in user_config.pri", $$MAVLINK_CONF))
     } else {
-        MAVLINK_CONF = ardupilotmega
+        MAVLINK_CONF = all
+        message($$sprintf("Using MAVLink dialect '%1'.", $$MAVLINK_CONF))
     }
 }
 
@@ -67,32 +68,18 @@ contains (CONFIG, QGC_DISABLE_APM_MAVLINK) {
     CONFIG  += ArdupilotEnabled
 }
 
-# First we select the dialect, checking for valid user selection
-# Users can override all other settings by specifying MAVLINK_CONF as an argument to qmake
-!isEmpty(MAVLINK_CONF) {
-    message($$sprintf("Using MAVLink dialect '%1'.", $$MAVLINK_CONF))
-}
-
 # Then we add the proper include paths dependent on the dialect.
 INCLUDEPATH += $$MAVLINKPATH
 
-exists($$MAVLINKPATH/common) {
-    !isEmpty(MAVLINK_CONF) {
-        count(MAVLINK_CONF, 1) {
-            exists($$MAVLINKPATH/$$MAVLINK_CONF) {
-                INCLUDEPATH += $$MAVLINKPATH/$$MAVLINK_CONF
-                DEFINES += $$sprintf('QGC_USE_%1_MESSAGES', $$upper($$MAVLINK_CONF))
-            } else {
-                error($$sprintf("MAVLink dialect '%1' does not exist at '%2'!", $$MAVLINK_CONF, $$MAVLINKPATH_REL))
-            }
-        } else {
-            error(Only a single mavlink dialect can be specified in MAVLINK_CONF)
-        }
+count(MAVLINK_CONF, 1) {
+    exists($$MAVLINKPATH/$$MAVLINK_CONF) {
+        INCLUDEPATH += $$MAVLINKPATH/$$MAVLINK_CONF
+        DEFINES += $$sprintf('QGC_USE_%1_MESSAGES', $$upper($$MAVLINK_CONF))
     } else {
-        INCLUDEPATH += $$MAVLINKPATH/common
+        error($$sprintf("MAVLink dialect '%1' does not exist at '%2'!", $$MAVLINK_CONF, $$MAVLINKPATH_REL))
     }
 } else {
-    error($$sprintf("MAVLink folder does not exist at '%1'! Run 'git submodule init && git submodule update' on the command line.",$$MAVLINKPATH_REL))
+    error(Only a single mavlink dialect can be specified in MAVLINK_CONF)
 }
 
 #
@@ -105,11 +92,13 @@ DEFINES += NOMINMAX
 # [REQUIRED] Events submodule
 HEADERS+= \
 	libs/libevents/libevents/libs/cpp/protocol/receive.h \
+	libs/libevents/libevents/libs/cpp/parse/health_and_arming_checks.h \
 	libs/libevents/libevents/libs/cpp/parse/parser.h \
 	libs/libevents/libevents/libs/cpp/generated/events_generated.h \
 	libs/libevents/libevents_definitions.h
 SOURCES += \
 	libs/libevents/libevents/libs/cpp/protocol/receive.cpp \
+	libs/libevents/libevents/libs/cpp/parse/health_and_arming_checks.cpp \
 	libs/libevents/libevents/libs/cpp/parse/parser.cpp \
 	libs/libevents/definitions.cpp
 INCLUDEPATH += \
@@ -224,9 +213,9 @@ MacBuild {
 # Include Android OpenSSL libs
 AndroidBuild {
     include($$SOURCE_DIR/libs/OpenSSL/android_openssl/openssl.pri)
-    message("ANDROID_EXTRA_LIBS")
-    message($$ANDROID_TARGET_ARCH)
-    message($$ANDROID_EXTRA_LIBS)
+    #message("ANDROID_EXTRA_LIBS")
+    #message($$ANDROID_TARGET_ARCH)
+    #message($$ANDROID_EXTRA_LIBS)
 }
 
 # Pairing
@@ -274,55 +263,4 @@ contains (DEFINES, DISABLE_ZEROCONF) {
     DEFINES += QGC_ZEROCONF_ENABLED
 } else {
     message("Skipping support for Zeroconf (unsupported platform)")
-}
-
-#
-# [OPTIONAL] AirMap Support
-#
-contains (DEFINES, DISABLE_AIRMAP) {
-    message("Skipping support for AirMap (manual override from command line)")
-# Otherwise the user can still disable this feature in the user_config.pri file.
-} else:exists(user_config.pri):infile(user_config.pri, DEFINES, DISABLE_AIRMAP) {
-    message("Skipping support for AirMap (manual override from user_config.pri)")
-} else {
-    AIRMAP_PLATFORM_SDK_PATH    = $${OUT_PWD}/libs/airmap-platform-sdk
-    AIRMAP_QT_PATH              = Qt.$${QT_MAJOR_VERSION}.$${QT_MINOR_VERSION}
-    message("Including support for AirMap")
-    MacBuild {
-        exists("$${AIRMAPD_PATH}/macOS/$$AIRMAP_QT_PATH") {
-            message("Including support for AirMap for macOS")
-            LIBS += -L$${AIRMAPD_PATH}/macOS/$$AIRMAP_QT_PATH -lairmap-qt
-            DEFINES += QGC_AIRMAP_ENABLED
-        }
-    } else:LinuxBuild {
-        #-- Download and install platform-sdk libs and headers iff they're not already in the build directory
-        AIRMAP_PLATFORM_SDK_URL = "https://github.com/airmap/platform-sdk/releases/download/2.0/airmap-platform-sdk-2.0.0-Linux.deb"
-        AIRMAP_PLATFORM_SDK_FILEPATH = "$${OUT_PWD}/airmap-platform-sdk.deb"
-        AIRMAP_PLATFORM_SDK_INSTALL_DIR = "tmp"
-
-        airmap_platform_sdk_install.target = $${AIRMAP_PLATFORM_SDK_PATH}/include/airmap
-        airmap_platform_sdk_install.commands = \
-            rm -rf $${AIRMAP_PLATFORM_SDK_PATH} && \
-            mkdir -p "$${AIRMAP_PLATFORM_SDK_PATH}/linux/$${AIRMAP_QT_PATH}" && \
-            mkdir -p "$${AIRMAP_PLATFORM_SDK_PATH}/include/airmap" && \
-            mkdir -p "$${AIRMAP_PLATFORM_SDK_PATH}/$${AIRMAP_PLATFORM_SDK_INSTALL_DIR}" && \
-            curl --location --output "$${AIRMAP_PLATFORM_SDK_FILEPATH}" "$${AIRMAP_PLATFORM_SDK_URL}" && \
-            ar p "$${AIRMAP_PLATFORM_SDK_FILEPATH}" data.tar.gz | tar xvz -C "$${AIRMAP_PLATFORM_SDK_PATH}/$${AIRMAP_PLATFORM_SDK_INSTALL_DIR}/" --strip-components=1 && \
-            mv -u "$${AIRMAP_PLATFORM_SDK_PATH}/$${AIRMAP_PLATFORM_SDK_INSTALL_DIR}/usr/lib/x86_64-linux-gnu/*" "$${AIRMAP_PLATFORM_SDK_PATH}/linux/$${AIRMAP_QT_PATH}/" && \
-            mv -u "$${AIRMAP_PLATFORM_SDK_PATH}/$${AIRMAP_PLATFORM_SDK_INSTALL_DIR}/usr/include/airmap/*" "$${AIRMAP_PLATFORM_SDK_PATH}/include/airmap/" && \
-            rm -rf "$${AIRMAP_PLATFORM_SDK_PATH}/$${AIRMAP_PLATFORM_SDK_INSTALL_DIR}" && \
-            rm "$${AIRMAP_PLATFORM_SDK_FILEPATH}"
-        airmap_platform_sdk_install.depends =
-        QMAKE_EXTRA_TARGETS += airmap_platform_sdk_install
-        PRE_TARGETDEPS += $$airmap_platform_sdk_install.target
-
-        LIBS += -L$${AIRMAP_PLATFORM_SDK_PATH}/linux/$${AIRMAP_QT_PATH} -lairmap-cpp
-        DEFINES += QGC_AIRMAP_ENABLED
-    } else {
-        message("Skipping support for Airmap (unsupported platform)")
-    }
-    contains (DEFINES, QGC_AIRMAP_ENABLED) {
-        INCLUDEPATH += \
-            $${AIRMAP_PLATFORM_SDK_PATH}/include
-    }
 }

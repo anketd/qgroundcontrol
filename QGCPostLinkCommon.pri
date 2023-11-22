@@ -25,22 +25,12 @@ MacBuild {
     # with the differences between post list command running in a shell script (XCode) versus a makefile (Qt Creator)
     macx-xcode {
         # SDL2 Framework
-        QMAKE_POST_LINK += && rsync -a --delete $$SOURCE_DIR/libs/Frameworks/SDL2.Framework $BUILT_PRODUCTS_DIR/$${TARGET}.app/Contents/Frameworks
+        QMAKE_POST_LINK += && rsync -a --delete $$SOURCE_DIR/libs/Frameworks/SDL2.framework $BUILT_PRODUCTS_DIR/$${TARGET}.app/Contents/Frameworks
         QMAKE_POST_LINK += && install_name_tool -change "@rpath/SDL2.framework/Versions/A/SDL2" "@executable_path/../Frameworks/SDL2.framework/Versions/A/SDL2" $BUILT_PRODUCTS_DIR/$${TARGET}.app/Contents/MacOS/$${TARGET}
-        # AirMap
-        contains (DEFINES, QGC_AIRMAP_ENABLED) {
-            QMAKE_POST_LINK += && rsync -a $$SOURCE_DIR/libs/airmapd/macOS/$$AIRMAP_QT_PATH/* $BUILT_PRODUCTS_DIR/$${TARGET}.app/Contents/Frameworks/
-            QMAKE_POST_LINK += && install_name_tool -change "@rpath/libairmap-qt.0.0.1.dylib" "@executable_path/../Frameworks/libairmap-qt.0.0.1.dylib" $BUILT_PRODUCTS_DIR/$${TARGET}.app/Contents/MacOS/$${TARGET}
-        }
     } else {
         # SDL2 Framework
-        QMAKE_POST_LINK += && rsync -a --delete $$SOURCE_DIR/libs/Frameworks/SDL2.Framework $${TARGET}.app/Contents/Frameworks
+        QMAKE_POST_LINK += && rsync -a --delete $$SOURCE_DIR/libs/Frameworks/SDL2.framework $${TARGET}.app/Contents/Frameworks
         QMAKE_POST_LINK += && install_name_tool -change "@rpath/SDL2.framework/Versions/A/SDL2" "@executable_path/../Frameworks/SDL2.framework/Versions/A/SDL2" $${TARGET}.app/Contents/MacOS/$${TARGET}
-        # AirMap
-        contains (DEFINES, QGC_AIRMAP_ENABLED) {
-            QMAKE_POST_LINK += && rsync -a $$SOURCE_DIR/libs/airmap-platform-sdk/macOS/$$AIRMAP_QT_PATH/* $${TARGET}.app/Contents/Frameworks/
-            QMAKE_POST_LINK += && install_name_tool -change "@rpath/libairmap-qt.0.0.1.dylib" "@executable_path/../Frameworks/libairmap-qt.0.0.1.dylib" $${TARGET}.app/Contents/MacOS/$${TARGET}
-        }
     }
 }
 
@@ -64,7 +54,9 @@ WindowsBuild {
         # Copy Visual Studio DLLs
         # Note that this is only done for release because the debugging versions of these DLLs cannot be redistributed.
         QMAKE_POST_LINK += $$escape_expand(\\n) $$QMAKE_COPY \"$$SOURCE_DIR\\libs\\Microsoft\\windows\\msvcp140.dll\"  \"$$DESTDIR\"
+        QMAKE_POST_LINK += $$escape_expand(\\n) $$QMAKE_COPY \"$$SOURCE_DIR\\libs\\Microsoft\\windows\\msvcp140_1.dll\"  \"$$DESTDIR\"
         QMAKE_POST_LINK += $$escape_expand(\\n) $$QMAKE_COPY \"$$SOURCE_DIR\\libs\\Microsoft\\windows\\vcruntime140.dll\"  \"$$DESTDIR\"
+        QMAKE_POST_LINK += $$escape_expand(\\n) $$QMAKE_COPY \"$$SOURCE_DIR\\libs\\Microsoft\\windows\\vcruntime140_1.dll\"  \"$$DESTDIR\"
     }
 
     DEPLOY_TARGET = $$shell_quote($$shell_path($$DESTDIR\\$${TARGET}.exe))
@@ -130,9 +122,9 @@ LinuxBuild {
             libicui18n.so \
             libicuuc.so
     }
-
+    # Copy only if non-existing to avoid file timestamp updates
     for(QT_LIB, QT_LIB_LIST) {
-        QMAKE_POST_LINK += && $$QMAKE_COPY --dereference $$[QT_INSTALL_LIBS]/$$QT_LIB $$DESTDIR/Qt/libs/
+        QMAKE_POST_LINK += && $$QMAKE_COPY -n --dereference $$[QT_INSTALL_LIBS]/$$QT_LIB $$DESTDIR/Qt/libs/
     }
 
     # QT_INSTALL_PLUGINS
@@ -152,16 +144,11 @@ LinuxBuild {
     }
 
     for(QT_PLUGIN, QT_PLUGIN_LIST) {
-        QMAKE_POST_LINK += && $$QMAKE_COPY --dereference --recursive $$[QT_INSTALL_PLUGINS]/$$QT_PLUGIN $$DESTDIR/Qt/plugins/
+        QMAKE_POST_LINK += && $$QMAKE_COPY -n --dereference --recursive $$[QT_INSTALL_PLUGINS]/$$QT_PLUGIN $$DESTDIR/Qt/plugins/
     }
 
     # QT_INSTALL_QML
-    QMAKE_POST_LINK += && $$QMAKE_COPY --dereference --recursive $$[QT_INSTALL_QML] $$DESTDIR/Qt/
-
-    # Airmap
-    contains (DEFINES, QGC_AIRMAP_ENABLED) {
-        QMAKE_POST_LINK += && $$QMAKE_COPY $$OUT_PWD/libs/airmap-platform-sdk/linux/$$AIRMAP_QT_PATH/libairmap-cpp.so.2.0.0 $$DESTDIR/Qt/libs/
-    }
+    QMAKE_POST_LINK += && $$QMAKE_COPY -n --dereference --recursive $$[QT_INSTALL_QML] $$DESTDIR/Qt/
 
     # QGroundControl start script
     contains (CONFIG, QGC_DISABLE_CUSTOM_BUILD) | !exists($$PWD/custom/custom.pri) {
