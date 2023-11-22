@@ -4508,3 +4508,4 @@ void Vehicle::sendGripperAction(GRIPPER_OPTIONS gripperOption)
         default: 
         break;
     }
+}
